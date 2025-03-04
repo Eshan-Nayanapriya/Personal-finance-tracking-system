@@ -1,42 +1,32 @@
 import mongoose, { Schema } from "mongoose";
 
-const TransactionSchema = new Schema({
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: "User",
-    required: [true, "UserID is required"],
+const TransactionSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    amount: {
+      type: Number,
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["income", "expense"],
+      required: true,
+    },
+    category: {
+      type: String,
+      required: true,
+    },
+    tags: [String],
+    date: { type: Date, default: Date.now },
+    isRecurring: { type: Boolean, default: false },
+    recurrencePattern: { type: String, enum: ["daily", "weekly", "monthly"] },
+    endDate: Date,
   },
-  amount: {
-    type: Number,
-    required: true,
-  },
-  currency: {
-    type: String,
-    enum: ["USD", "LKR", "JPY", "EUR", "GBP", "AUD", "CAD", "CHF"],
-    required: true,
-  },
-  type: {
-    type: String,
-    enum: ["income", "expense"],
-    required: true,
-  },
-  category: {
-    type: String,
-    required: true,
-  },
-  tags: [String],
-  date: {
-    type: Date,
-    default: Date.now,
-  },
-  isRecurring: {
-    type: Boolean,
-    default: false,
-  },
-  recurrencePattern: String,
-  description: String,
-});
+  { timestamps: true }
+);
 
-const TransactionModel = mongoose.model("Transaction", TransactionSchema);
-
-export default TransactionModel;
+export default mongoose.model("Transaction", TransactionSchema);
