@@ -91,7 +91,7 @@ export async function login(request, response) {
     return response.status(200).json({
       message: "User logged in successfully!",
       data: {
-        user: { id: user._id, name: user.name, email: user.email },
+        user: { id: user._id, name: user.name, role:user.role, email: user.email },
         accessToken,
       },
       error: false,

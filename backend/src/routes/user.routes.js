@@ -21,4 +21,5 @@ userRouter.get("/user", (req, res) => {
   return res.json({ message: "User dashboard", user: req.user });
 });
 
+
 export default userRouter;

@@ -1,5 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 
+export const currencyCategories = ["USD", "LKR", "JPY", "EUR", "GBP", "AUD", "CAD", "CHF"];
+
 const UserSchema = new Schema(
   {
     name: {
@@ -23,6 +25,13 @@ const UserSchema = new Schema(
       type: String,
       required: [true, "Password is required"],
       unique: false,
+    },
+    currency: {
+      type: String,
+      required: [true, "Currency is required"],
+      unique: false,
+      enum: currencyCategories,
+      default: "LKR",
     },
   },
   {

@@ -5,6 +5,7 @@ dotenv.config();
 import dbConnect from "./src/configs/dbConfig.js";
 import userRouter from "./src/routes/user.routes.js";
 import authRouter from "./src/routes/auth.routes.js";
+import budgetRouter from "./src/routes/budget.routes.js";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
+app.use("/api/budgets", budgetRouter);
 
 const PORT = process.env.SERVER_PORT || 5001;
 
