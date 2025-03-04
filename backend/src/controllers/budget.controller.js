@@ -51,6 +51,9 @@ export async function createBudget(req, res) {
       user.currency
     );
 
+    if (!category) {
+      category = "monthly budget";
+    }
 
     // If no month is provided, use the current month
     if (!month) {
@@ -106,5 +109,68 @@ export async function createBudget(req, res) {
         ? "Invalid budget data"
         : error.message,
     });
+  }
+}
+
+// Get all budgets for the user (with filters)
+export async function getAllBudgets(req, res) {
+  try {
+    const userId = req.user.id;
+    const { month, category } = req.query;
+
+    const filter = { userId };
+    if (month) filter.month = month;
+    if (category) filter.category = category;
+
+    const budgets = await BudgetModel.find(filter).lean();
+    res.status(200).json({ success: true, data: budgets });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+// Update a budget
+export async function updateBudget(req, res) {
+  try {
+    const userId = req.user.id;
+    const budgetId = req.params.id;
+    const updates = req.body;
+
+    const budget = await BudgetModel.findOne({ _id: budgetId, userId });
+    if (!budget) {
+      return res.status(404).json({ success: false, message: "Budget not found" });
+    }
+
+    // Handle currency conversion if amount/currency is updated
+    if (updates.amount || updates.currency) {
+      const user = await UserModel.findById(userId);
+      const convertedAmount = await convertCurrency(
+        updates.amount || budget.amount,
+        updates.currency || user.currency,
+        user.currency
+      );
+      updates.amount = convertedAmount;
+    }
+
+    const updatedBudget = await BudgetModel.findByIdAndUpdate(budgetId, updates, { new: true });
+    res.status(200).json({ success: true, data: updatedBudget });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+// Delete a budget
+export async function deleteBudget(req, res) {
+  try {
+    const userId = req.user.id;
+    const budgetId = req.params.id;
+
+    const budget = await BudgetModel.findOneAndDelete({ _id: budgetId, userId });
+    if (!budget) {
+      return res.status(404).json({ success: false, message: "Budget not found" });
+    }
+    res.status(200).json({ success: true, message: "Budget deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 }
