@@ -5,12 +5,13 @@ import { budgetCategories } from "../models/budget.model.js";
 import { currencyCategories } from "../models/user.model.js";
 import moment from "moment";
 
+//create a budget
 export async function createBudget(req, res) {
   try {
     const userId = req.user.id;
     let { category, amount, month, currency } = req.body;
 
-    const currentMonth = moment().format("YYYY-MM");
+    const currentMonth = moment().format("YYYY-MM");//used moment to change date format
 
     // Validate required fields
     if (!category && !month) {
@@ -97,7 +98,7 @@ export async function createBudget(req, res) {
     return res.status(201).json({
       success: true,
       data: {
-        ...savedBudget.toObject(),
+        ...savedBudget.toObject(),//toObject() to convert to JSON object
         originalAmount: amount,
         originalCurrency: currency,
       },
@@ -105,7 +106,7 @@ export async function createBudget(req, res) {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message.includes("validation")
+      message: error.message.includes("validation")//check if error message contains "validation"
         ? "Invalid budget data"
         : error.message,
     });
@@ -119,10 +120,10 @@ export async function getAllBudgets(req, res) {
     const { month, category } = req.query;
 
     const filter = { userId };
-    if (month) filter.month = month;
-    if (category) filter.category = category;
+    if (month) filter.month = month; // Filter by month
+    if (category) filter.category = category; // Filter by category
 
-    const budgets = await BudgetModel.find(filter).lean();
+    const budgets = await BudgetModel.find(filter).lean(); // Lean to convert to JSON object
     res.status(200).json({ success: true, data: budgets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -170,6 +171,36 @@ export async function deleteBudget(req, res) {
       return res.status(404).json({ success: false, message: "Budget not found" });
     }
     res.status(200).json({ success: true, message: "Budget deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+//monthly budget report
+export async function createBudgetReport(req, res) {
+  try {
+    const userId = req.user.id;
+    const { month } = req.body;
+
+    if (!month) {
+      return res.status(400).json({ success: false, message: "Month is required" });
+    }
+
+    const filter = { userId, month };
+
+    const budgets = await BudgetModel.find(filter).lean();
+    if (!budgets.length) {
+      return res.status(404).json({ success: false, message: "Budgets not found" });
+    }
+
+    const totalBudget = budgets.reduce((acc, budget) => acc + budget.amount, 0);
+    const report = {
+      totalBudget,
+      totalCategories: budgets.length,
+      data: budgets,
+    };
+
+    res.status(200).json({ success: true, data: report });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

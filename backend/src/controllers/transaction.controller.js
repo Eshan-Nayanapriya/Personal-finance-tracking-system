@@ -6,6 +6,7 @@ import UserModel from "../models/user.model.js";
 import { recurrencePatterns } from "../models/transaction.model.js";
 import mongoose from "mongoose";
 
+// Create a transaction
 export async function createTransaction(req, res) {
   try {
     const {
@@ -26,6 +27,7 @@ export async function createTransaction(req, res) {
       });
     }
 
+    // Validate recurrence
     if (isRecurring && typeof isRecurring !== "boolean") {
       return res.status(400).json({
         success: false,
@@ -33,6 +35,7 @@ export async function createTransaction(req, res) {
       });
     }
 
+    // Validate recurrence pattern
     if (isRecurring === true && !recurrencePattern) {
       return res.status(400).json({
         success: false,
@@ -40,6 +43,7 @@ export async function createTransaction(req, res) {
       });
     }
 
+    // Validate recurrence pattern
     if (recurrencePattern && !recurrencePatterns.includes(recurrencePattern)) {
       return res.status(400).json({
         success: false,
@@ -48,6 +52,7 @@ export async function createTransaction(req, res) {
       });
     }
 
+    // Validate transaction type
     if (transactionType !== "income" && transactionType !== "expense") {
       return res.status(400).json({
         success: false,
@@ -89,6 +94,15 @@ export async function createTransaction(req, res) {
       user.currency
     );
 
+    const transactionCount = await TransactionModel.countDocuments({ userId });
+
+    if (transactionCount >= user.transactionLimit) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction limit reached",
+      });
+    }
+
     const transaction = new TransactionModel({
       userId,
       amount: convertedAmount,
@@ -107,6 +121,7 @@ export async function createTransaction(req, res) {
   }
 }
 
+// Get all transactions
 export async function getTransactions(req, res) {
   try {
     const userId = req.user.id;
@@ -120,6 +135,7 @@ export async function getTransactions(req, res) {
   }
 }
 
+//update transaction
 export async function updateTransaction(req, res) {
   try {
     const userId = req.user.id;
@@ -201,6 +217,7 @@ export async function updateTransaction(req, res) {
   }
 }
 
+// Delete a transaction
 export async function deleteTransaction(req, res) {
   try {
     const userId = req.user.id;
@@ -238,6 +255,7 @@ export async function deleteTransaction(req, res) {
   }
 }
 
+// Get all expenses
 export async function getExpenses(req, res) {
   try {
     const userId = req.user.id;
@@ -253,6 +271,7 @@ export async function getExpenses(req, res) {
   }
 }
 
+// Get all incomes
 export async function getIncomes(req, res) {
   try {
     const userId = req.user.id;
@@ -263,6 +282,89 @@ export async function getIncomes(req, res) {
     }).lean();
 
     res.status(200).json({ success: true, data: expenses });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+//create transaction report
+export async function createTransactionReport(req, res) {
+  try {
+    const userId = req.user.id;
+    const { startDate, endDate } = req.body;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter start date and end date to set date range",
+      });
+    }
+
+    // Convert strings to Date objects
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999); // Include entire end date
+
+    if (start > end) {
+      return res.status(400).json({
+        success: false,
+        message: "Start date cannot be greater than end date",
+      });
+    }
+
+    const transactions = await TransactionModel.find({
+      userId,
+      createdAt: { $gte: startDate, $lte: endDate },
+    });
+
+    const totalIncome = transactions
+      .filter((t) => t.transactionType === "income")
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const totalExpense = transactions
+      .filter((t) => t.transactionType === "expense")
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const totalTransactions = transactions.length;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalIncome,
+        totalExpense,
+        totalTransactions,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+//filter transactions by tags
+export async function filterTransactions(req, res) {
+  try {
+    const userId = req.user.id;
+    const { category } = req.body;
+
+    if (!category) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Category tag is required" });
+    }
+
+    if (!budgetCategories.includes(category)) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "That category tag is not available",
+        });
+    }
+
+    const filter = { userId, category };
+
+    const transactions = await TransactionModel.find(filter).lean();
+    res.status(200).json({ success: true, data: transactions });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

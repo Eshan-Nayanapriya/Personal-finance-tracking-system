@@ -7,6 +7,8 @@ import {
   getExpenses,
   getIncomes,
   updateTransaction,
+  createTransactionReport,
+  filterTransactions,
 } from "../controllers/transaction.controller.js";
 
 const transactionRouter = Router();
@@ -18,5 +20,7 @@ transactionRouter.get("/expenses", getExpenses);
 transactionRouter.get("/incomes", getIncomes);
 transactionRouter.put("/:id", updateTransaction);
 transactionRouter.delete("/:id", deleteTransaction);
+transactionRouter.get("/report", createTransactionReport);
+transactionRouter.get("/filter", filterTransactions);
 
 export default transactionRouter;

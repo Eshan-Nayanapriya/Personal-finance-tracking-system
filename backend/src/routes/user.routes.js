@@ -5,6 +5,7 @@ import {
   deleteUser,
   assignAdminRole,
   getAllTransactions,
+  updateTransactionLimit,
 } from "../controllers/user.controller.js";
 
 const userRouter = Router();
@@ -47,6 +48,14 @@ userRouter.get(
   verifyToken,
   authorizeAdmin,
   getAllTransactions
+);
+
+//update transaction limits for all users
+userRouter.put(
+  "/admin/transactions/update-limit",
+  verifyToken,
+  authorizeAdmin,
+  updateTransactionLimit
 );
 
 //only admin, user can access this route

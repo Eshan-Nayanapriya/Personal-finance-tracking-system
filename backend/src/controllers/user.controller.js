@@ -89,3 +89,36 @@ export async function getAllTransactions(req, res) {
     });
   }
 }
+
+//adjust system settings, change transaction limits (admin only)
+export async function updateTransactionLimit(req, res) {
+  try {
+    const { newLimit } = req.body;
+
+    if (!newLimit || typeof newLimit !== "number" || newLimit <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid transaction limit. It must be a positive number.",
+      });
+    }
+
+    const result = await UserModel.updateMany(
+      {},
+      { transactionLimit: newLimit }
+    );
+
+    console.log(`Updated ${result.modifiedCount} users.`);
+
+    res.status(200).json({
+      success: true,
+      message: `${result.modifiedCount} users updated.`,
+    });
+  } catch (error) {
+    console.error("Error updating transaction limit:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}

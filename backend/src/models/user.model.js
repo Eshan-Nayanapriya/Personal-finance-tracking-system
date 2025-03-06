@@ -1,6 +1,15 @@
 import mongoose, { Schema } from "mongoose";
 
-export const currencyCategories = ["USD", "LKR", "JPY", "EUR", "GBP", "AUD", "CAD", "CHF"];
+export const currencyCategories = [
+  "USD",
+  "LKR",
+  "JPY",
+  "EUR",
+  "GBP",
+  "AUD",
+  "CAD",
+  "CHF",
+];
 
 const UserSchema = new Schema(
   {
@@ -32,6 +41,10 @@ const UserSchema = new Schema(
       unique: false,
       enum: currencyCategories,
       default: "LKR",
+    },
+    transactionLimit: {
+      type: Number,
+      default: 100,
     },
   },
   {
