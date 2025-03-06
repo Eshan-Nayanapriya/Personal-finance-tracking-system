@@ -4,6 +4,7 @@ import {
   getAllUsers,
   deleteUser,
   assignAdminRole,
+  getAllTransactions,
 } from "../controllers/user.controller.js";
 
 const userRouter = Router();
@@ -23,8 +24,30 @@ userRouter.get("/admin", verifyToken, authorizeAdmin, (req, res) => {
 
 // Admin-only routes
 userRouter.get("/admin/users", verifyToken, authorizeAdmin, getAllUsers);
-userRouter.delete("/admin/users/:userId", verifyToken, authorizeAdmin, deleteUser);
-userRouter.put("/admin/users/assign-admin/:userId", verifyToken, authorizeAdmin, assignAdminRole);
+
+// Delete a user
+userRouter.delete(
+  "/admin/users/:userId",
+  verifyToken,
+  authorizeAdmin,
+  deleteUser
+);
+
+// Assign admin role to a user
+userRouter.put(
+  "/admin/users/assign-admin/:userId",
+  verifyToken,
+  authorizeAdmin,
+  assignAdminRole
+);
+
+//getall transactions of all users
+userRouter.get(
+  "/admin/transactions",
+  verifyToken,
+  authorizeAdmin,
+  getAllTransactions
+);
 
 //only admin, user can access this route
 userRouter.get("/user", (req, res) => {

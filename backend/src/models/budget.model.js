@@ -11,7 +11,9 @@ export const budgetCategories = [
   "savings",
   "debt",
   "monthly budget",
-  "other"
+  "other",
+  "bussiness",
+  "salary"
 ];
 
 const BudgetSchema = new Schema(
