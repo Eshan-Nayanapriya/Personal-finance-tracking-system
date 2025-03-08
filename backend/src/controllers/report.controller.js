@@ -1,5 +1,6 @@
 import TransactionModel from "../models/transaction.model.js";
 import { convertCurrency } from "../services/currency.service.js";
+import UserModel from "../models/user.model.js";
 
 export async function generateSpendingReport(req, res) {
   try {

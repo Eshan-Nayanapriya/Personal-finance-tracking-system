@@ -6,6 +6,8 @@ import {
   assignAdminRole,
   getAllTransactions,
   updateTransactionLimit,
+  changePassword,
+  updateUserDetails,
 } from "../controllers/user.controller.js";
 
 const userRouter = Router();
@@ -62,5 +64,11 @@ userRouter.put(
 userRouter.get("/user", (req, res) => {
   return res.json({ message: "User dashboard", user: req.user });
 });
+
+// Update user details
+userRouter.put("/user/update-details", verifyToken, updateUserDetails);
+
+// Change password
+userRouter.put("/user/change-password", verifyToken, changePassword);
 
 export default userRouter;

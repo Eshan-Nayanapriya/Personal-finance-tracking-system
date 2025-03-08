@@ -3,6 +3,7 @@ import { convertCurrency } from "../services/currency.service.js";
 import UserModel from "../models/user.model.js";
 import { budgetCategories } from "../models/budget.model.js";
 import { currencyCategories } from "../models/user.model.js";
+import NotificationModel from "../models/notification.model.js";
 import moment from "moment";
 
 //create a budget
@@ -11,7 +12,7 @@ export async function createBudget(req, res) {
     const userId = req.user.id;
     let { category, amount, month, currency } = req.body;
 
-    const currentMonth = moment().format("YYYY-MM");//used moment to change date format
+    const currentMonth = moment().format("YYYY-MM"); //used moment to change date format
 
     // Validate required fields
     if (!category && !month) {
@@ -35,6 +36,8 @@ export async function createBudget(req, res) {
         message: "User currency not found",
       });
     }
+
+    const name = user.name;
 
     // Validate category
     if (!currencyCategories.includes(currency)) {
@@ -88,6 +91,7 @@ export async function createBudget(req, res) {
 
     const newBudget = new BudgetModel({
       userId,
+      name,
       category,
       amount: convertedAmount,
       month,
@@ -95,10 +99,19 @@ export async function createBudget(req, res) {
 
     const savedBudget = await newBudget.save();
 
+    const newNotification = new NotificationModel({
+      userId,
+      secton: "Budget",
+      title: "Budget Created",
+      message: `New budget created for ${category}`,
+    });
+
+    await newNotification.save();
+
     return res.status(201).json({
       success: true,
       data: {
-        ...savedBudget.toObject(),//toObject() to convert to JSON object
+        ...savedBudget.toObject(), //toObject() to convert to JSON object
         originalAmount: amount,
         originalCurrency: currency,
       },
@@ -106,7 +119,7 @@ export async function createBudget(req, res) {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message.includes("validation")//check if error message contains "validation"
+      message: error.message.includes("validation") //check if error message contains "validation"
         ? "Invalid budget data"
         : error.message,
     });
@@ -139,8 +152,12 @@ export async function updateBudget(req, res) {
 
     const budget = await BudgetModel.findOne({ _id: budgetId, userId });
     if (!budget) {
-      return res.status(404).json({ success: false, message: "Budget not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Budget not found" });
     }
+
+    let category = budget.category;
 
     // Handle currency conversion if amount/currency is updated
     if (updates.amount || updates.currency) {
@@ -153,7 +170,31 @@ export async function updateBudget(req, res) {
       updates.amount = convertedAmount;
     }
 
-    const updatedBudget = await BudgetModel.findByIdAndUpdate(budgetId, updates, { new: true });
+    if (updates.category && budgetCategories.includes(updates.category)) {
+      category = updates.category;
+    } else if (updates.category) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
+      });
+    }
+
+    const updatedBudget = await BudgetModel.findByIdAndUpdate(
+      budgetId,
+      updates,
+      { new: true }
+    );
+
+    const newNotification = new NotificationModel({
+      userId,
+      secton: "Budget",
+      title: "Budget Updated",
+      message: `Budget updated for ${category}`,
+    });
+
+    await newNotification.save();
+
     res.status(200).json({ success: true, data: updatedBudget });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -166,10 +207,25 @@ export async function deleteBudget(req, res) {
     const userId = req.user.id;
     const budgetId = req.params.id;
 
-    const budget = await BudgetModel.findOneAndDelete({ _id: budgetId, userId });
+    const budget = await BudgetModel.findOneAndDelete({
+      _id: budgetId,
+      userId,
+    });
     if (!budget) {
-      return res.status(404).json({ success: false, message: "Budget not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Budget not found" });
     }
+
+    const newNotification = new NotificationModel({
+      userId,
+      secton: "Budget",
+      title: "Budget Deleted",
+      message: `budget deleted for ${budget.category}`,
+    });
+
+    await newNotification.save();
+
     res.status(200).json({ success: true, message: "Budget deleted" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -183,14 +239,18 @@ export async function createBudgetReport(req, res) {
     const { month } = req.body;
 
     if (!month) {
-      return res.status(400).json({ success: false, message: "Month is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Month is required" });
     }
 
     const filter = { userId, month };
 
     const budgets = await BudgetModel.find(filter).lean();
     if (!budgets.length) {
-      return res.status(404).json({ success: false, message: "Budgets not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Budgets not found" });
     }
 
     const totalBudget = budgets.reduce((acc, budget) => acc + budget.amount, 0);

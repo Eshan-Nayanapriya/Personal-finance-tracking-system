@@ -122,3 +122,86 @@ export async function updateTransactionLimit(req, res) {
     });
   }
 }
+
+//update user details
+export async function updateUserDetails(req, res) {
+  try {
+    const userId = req.user.id;
+    const { name, email, currency } = req.body;
+
+    const updateData = { name, email, currency };
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User details updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}
+
+//change password
+export async function changePassword(req, res) {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await bcryptjs.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    const salt = await bcryptjs.genSalt(10);
+    const hashedPassword = await bcryptjs.hash(newPassword, salt);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}

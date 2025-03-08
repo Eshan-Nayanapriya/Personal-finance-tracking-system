@@ -13,7 +13,7 @@ export const budgetCategories = [
   "monthly budget",
   "other",
   "bussiness",
-  "salary"
+  "salary",
 ];
 
 const BudgetSchema = new Schema(
@@ -22,6 +22,10 @@ const BudgetSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: [true, "UserID is required"],
+    },
+    name: {
+      type: String,
+      required: [true, "Name is required"],
     },
     category: {
       type: String,
