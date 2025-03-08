@@ -101,7 +101,7 @@ export async function createBudget(req, res) {
 
     const newNotification = new NotificationModel({
       userId,
-      secton: "Budget",
+      section: "Budget",
       title: "Budget Created",
       message: `New budget created for ${category}`,
     });
@@ -188,7 +188,7 @@ export async function updateBudget(req, res) {
 
     const newNotification = new NotificationModel({
       userId,
-      secton: "Budget",
+      section: "Budget",
       title: "Budget Updated",
       message: `Budget updated for ${category}`,
     });
@@ -219,7 +219,7 @@ export async function deleteBudget(req, res) {
 
     const newNotification = new NotificationModel({
       userId,
-      secton: "Budget",
+      section: "Budget",
       title: "Budget Deleted",
       message: `budget deleted for ${budget.category}`,
     });

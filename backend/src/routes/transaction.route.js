@@ -9,6 +9,7 @@ import {
   updateTransaction,
   createTransactionReport,
   filterTransactions,
+  notifyRecurringTransactions,
 } from "../controllers/transaction.controller.js";
 
 const transactionRouter = Router();
@@ -22,5 +23,6 @@ transactionRouter.put("/:id", updateTransaction);
 transactionRouter.delete("/:id", deleteTransaction);
 transactionRouter.get("/report", createTransactionReport);
 transactionRouter.get("/filter", filterTransactions);
+transactionRouter.get("/notify-recurring", notifyRecurringTransactions);
 
 export default transactionRouter;
