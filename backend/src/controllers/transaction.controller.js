@@ -1,7 +1,7 @@
 import TransactionModel from "../models/transaction.model.js";
 import { convertCurrency } from "../services/currency.service.js";
 import { currencyCategories } from "../models/user.model.js";
-import { budgetCategories } from "../models/budget.model.js";
+import BudgetModel, { budgetCategories } from "../models/budget.model.js";
 import UserModel from "../models/user.model.js";
 import { recurrencePatterns } from "../models/transaction.model.js";
 import mongoose from "mongoose";
@@ -104,6 +104,37 @@ export async function createTransaction(req, res) {
       });
     }
 
+    if (transactionType === "expense") {
+      const budget = await BudgetModel.findOne({ userId, category });
+      if (budget) {
+        if (budget.remaining_amount < convertedAmount) {
+          return res.status(400).json({
+            success: false,
+            message: "Exceeding the budget limit for the category. Please decrease the amount",
+          });
+        }
+        budget.remaining_amount -= convertedAmount;
+        await budget.save();
+
+        if (budget.remaining_amount <= 5000) {
+          const newNotification = new NotificationModel({
+            userId,
+            section: "Budget",
+            title: "Budget Alert",
+            message: `Remaining amount for ${category} budget is low. Please allocate more funds.`,
+          });
+
+          await newNotification.save();
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Budget not found for relevant category. Please allocate a budget for the category first.",
+        });
+      }
+    }
+
     const transaction = new TransactionModel({
       userId,
       amount: convertedAmount,
@@ -194,6 +225,68 @@ export async function updateTransaction(req, res) {
 
       updates.amount = convertedAmount;
       updates.currency = user.currency;
+    }
+
+    // Validate transaction type
+    if (
+      updates.transactionType &&
+      updates.transactionType !== "income" &&
+      updates.transactionType !== "expense"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid transaction type, Please use either income or expense",
+      });
+    }
+
+    // Validate category
+    if (updates.category && !budgetCategories.includes(updates.category)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
+      });
+    }
+
+    // Update budget's remaining amount if transaction type is "expense"
+    if (
+      updates.transactionType === "expense" ||
+      transaction.transactionType === "expense"
+    ) {
+      const budget = await BudgetModel.findOne({
+        userId,
+        category: updates.category || transaction.category,
+      });
+      if (budget) {
+        const amountDifference =
+          (updates.amount || transaction.amount) - transaction.amount;
+        if (budget.remaining_amount < amountDifference) {
+          return res.status(400).json({
+            success: false,
+            message: "Budget limit reached for the category",
+          });
+        }
+        budget.remaining_amount -= amountDifference;
+        await budget.save();
+
+        if (budget.remaining_amount <= 5000) {
+          const newNotification = new NotificationModel({
+            userId,
+            section: "Budget",
+            title: "Budget Alert",
+            message: `Remaining amount for ${ updates.category || transaction.category} budget is low. Please allocate more funds.`,
+          });
+
+          await newNotification.save();
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Budget not found for relevant category. Please allocate a budget for the category first.",
+        });
+      }
     }
 
     // Update transaction
@@ -364,69 +457,6 @@ export async function filterTransactions(req, res) {
 
     const transactions = await TransactionModel.find(filter).lean();
     res.status(200).json({ success: true, data: transactions });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-}
-
-export async function notifyRecurringTransactions(req, res) {
-  try {
-    const userId = req.user.id;
-    const transactions = await TransactionModel.find({
-      userId,
-      isRecurring: true,
-    }).lean();
-
-    if (!transactions.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No recurring transactions found" });
-    }
-
-    const now = new Date();
-    const notifications = [];
-
-    transactions.forEach((transaction) => {
-      const { recurrencePattern, createdAt, category } = transaction;
-      const createdDate = new Date(createdAt);
-
-      let shouldNotify = false;
-
-      if (
-        recurrencePattern === "daily" &&
-        (now - createdDate) / (1000 * 60 * 60 * 24) >= 1
-      ) {
-        shouldNotify = true;
-      } else if (
-        recurrencePattern === "weekly" &&
-        (now - createdDate) / (1000 * 60 * 60 * 24 * 7) >= 1
-      ) {
-        shouldNotify = true;
-      } else if (
-        recurrencePattern === "monthly" &&
-        (now - createdDate) / (1000 * 60 * 60 * 24 * 30) >= 1
-      ) {
-        shouldNotify = true;
-      }
-
-      if (shouldNotify) {
-        const newNotification = new NotificationModel({
-          userId,
-          section: "Transaction",
-          title: "Recurring Transaction",
-          message: `${recurrencePattern} recurring transaction missed for ${category}`,
-        });
-
-        notifications.push(newNotification.save());
-      }
-    });
-
-    await Promise.all(notifications);
-
-    res.status(200).json({
-      success: true,
-      message: "Notifications created for missed recurring transactions",
-    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

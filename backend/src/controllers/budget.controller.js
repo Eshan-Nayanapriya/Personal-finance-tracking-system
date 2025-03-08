@@ -89,10 +89,24 @@ export async function createBudget(req, res) {
       });
     }
 
+    // Check if a budget for the same category and month already exists
+    const existingBudget = await BudgetModel.findOne({
+      userId,
+      category,
+      month,
+    });
+    if (existingBudget) {
+      return res.status(400).json({
+        success: false,
+        message: `A budget for category '${category}' already exists for the month '${month}', Try updating the existing budget instead or choose a different category or month.`,
+      });
+    }
+
     const newBudget = new BudgetModel({
       userId,
       name,
       category,
+      remaining_amount: convertedAmount,
       amount: convertedAmount,
       month,
     });
@@ -158,6 +172,7 @@ export async function updateBudget(req, res) {
     }
 
     let category = budget.category;
+    let month = budget.month;
 
     // Handle currency conversion if amount/currency is updated
     if (updates.amount || updates.currency) {
@@ -170,6 +185,39 @@ export async function updateBudget(req, res) {
       updates.amount = convertedAmount;
     }
 
+    if (updates.month) {
+      // Validate provided month format
+      if (!/^\d{4}-\d{2}$/.test(updates.month)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid month format. Please use 'YYYY-MM' format.",
+        });
+      }
+
+      // Check if the provided month is in the past
+      const currentMonth = moment().format("YYYY-MM");
+      if (
+        moment(updates.month, "YYYY-MM").isBefore(
+          moment(currentMonth, "YYYY-MM")
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot update a budget to a past month.",
+        });
+      }
+
+      month = updates.month;
+    }
+
+    // Check if a budget for the same category and month already exists
+    const existingBudget = await BudgetModel.findOne({
+      userId,
+      category,
+      month,
+      _id: { $ne: budgetId },
+    });
+
     if (updates.category && budgetCategories.includes(updates.category)) {
       category = updates.category;
     } else if (updates.category) {
@@ -177,6 +225,13 @@ export async function updateBudget(req, res) {
         success: false,
         message:
           "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
+      });
+    }
+
+    if (updates.category && existingBudget) {
+      return res.status(400).json({
+        success: false,
+        message: `A budget for category '${category}' already exists for the month '${month}', Try choosing a different category or month.`,
       });
     }
 
