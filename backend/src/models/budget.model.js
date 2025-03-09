@@ -35,12 +35,12 @@ const BudgetSchema = new Schema(
       type: Number,
       required: true,
       default: 20000,
-      min: [1, "Amount should be greater than 0"],
+      min: [0, "Amount should be equal or greater than 0"],
     },
     amount: {
       type: Number,
       required: true,
-      min: [1, "Amount should be greater than 0"],
+      min: [0, "Amount should be equal or greater than 0"],
     },
     month: {
       type: String,

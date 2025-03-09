@@ -57,6 +57,15 @@ export async function createBudget(req, res) {
 
     if (!category) {
       category = "monthly budget";
+    } else {
+      // Validate category
+      if (!budgetCategories.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
+        });
+      }
     }
 
     // If no month is provided, use the current month
@@ -80,15 +89,6 @@ export async function createBudget(req, res) {
       }
     }
 
-    // Validate category
-    if (!budgetCategories.includes(category)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
-      });
-    }
-
     // Check if a budget for the same category and month already exists
     const existingBudget = await BudgetModel.findOne({
       userId,
@@ -100,6 +100,48 @@ export async function createBudget(req, res) {
         success: false,
         message: `A budget for category '${category}' already exists for the month '${month}', Try updating the existing budget instead or choose a different category or month.`,
       });
+    }
+
+    if (category !== "monthly budget") {
+      const existingMonthlyBudget = await BudgetModel.findOne({
+        userId,
+        category: "monthly budget",
+        month,
+      });
+      if (!existingMonthlyBudget) {
+        return res.status(400).json({
+          success: false,
+          message: `Monthly budget not found for the month '${month}', Please create a monthly budget first.`,
+        });
+      }
+
+      // Deduct the category budget amount from the monthly budget
+      if (existingMonthlyBudget.remaining_amount - convertedAmount < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Monthly budget is not enough to create a budget for category '${category}'`,
+        });
+      } else {
+        existingMonthlyBudget.remaining_amount -= convertedAmount;
+        await existingMonthlyBudget.save();
+      }
+      if (existingMonthlyBudget.remaining_amount === 0) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget Exhausted",
+          message: `Monthly budget exhausted for the month ${month}`,
+        });
+        await newNotification.save();
+      } else if (existingMonthlyBudget.remaining_amount < 5000) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget is very low",
+          message: `Monthly budget is very low for the month ${month}`,
+        });
+        await newNotification.save();
+      }
     }
 
     const newBudget = new BudgetModel({
@@ -174,6 +216,14 @@ export async function updateBudget(req, res) {
     let category = budget.category;
     let month = budget.month;
 
+    if (updates.currency && !currencyCategories.includes(updates.currency)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid currency category, Please use following currency categories: USD, LKR, JPY, EUR, GBP, AUD, CAD, CHF",
+      });
+    }
+
     // Handle currency conversion if amount/currency is updated
     if (updates.amount || updates.currency) {
       const user = await UserModel.findById(userId);
@@ -183,6 +233,11 @@ export async function updateBudget(req, res) {
         user.currency
       );
       updates.amount = convertedAmount;
+    }
+
+    if (updates.amount) {
+      const amountDifference = updates.amount - budget.amount;
+      updates.remaining_amount = budget.remaining_amount + amountDifference;
     }
 
     if (updates.month) {
@@ -218,6 +273,16 @@ export async function updateBudget(req, res) {
       _id: { $ne: budgetId },
     });
 
+    if (
+      budget.category === "monthly budget" &&
+      updates.category !== "monthly budget"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot change the category of a monthly budget",
+      });
+    }
+
     if (updates.category && budgetCategories.includes(updates.category)) {
       category = updates.category;
     } else if (updates.category) {
@@ -233,6 +298,50 @@ export async function updateBudget(req, res) {
         success: false,
         message: `A budget for category '${category}' already exists for the month '${month}', Try choosing a different category or month.`,
       });
+    }
+
+    if (updates.category !== "monthly budget") {
+      const existingMonthlyBudget = await BudgetModel.findOne({
+        userId,
+        category: "monthly budget",
+        month,
+      });
+      if (!existingMonthlyBudget) {
+        return res.status(400).json({
+          success: false,
+          message: `Monthly budget not found for the month '${month}', Please create a monthly budget first.`,
+        });
+      }
+
+      if (updates.amount) {
+        const amountDifference = updates.amount - budget.amount;
+        if (existingMonthlyBudget.remaining_amount - amountDifference < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Monthly budget is not enough to update the budget for category '${category}'`,
+          });
+        } else {
+          existingMonthlyBudget.remaining_amount -= amountDifference;
+        }
+      }
+      await existingMonthlyBudget.save();
+      if (existingMonthlyBudget.remaining_amount === 0) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget Exhausted",
+          message: `Monthly budget exhausted for the month ${month}`,
+        });
+        await newNotification.save();
+      } else if (existingMonthlyBudget.remaining_amount < 5000) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget is very low",
+          message: `Monthly budget is very low for the month ${month}`,
+        });
+        await newNotification.save();
+      }
     }
 
     const updatedBudget = await BudgetModel.findByIdAndUpdate(
