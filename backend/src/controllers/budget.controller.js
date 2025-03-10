@@ -4,6 +4,7 @@ import UserModel from "../models/user.model.js";
 import { budgetCategories } from "../models/budget.model.js";
 import { currencyCategories } from "../models/user.model.js";
 import NotificationModel from "../models/notification.model.js";
+import GoalModel from "../models/goal.model.js";
 import moment from "moment";
 
 //create a budget
@@ -427,5 +428,118 @@ export async function createBudgetReport(req, res) {
     res.status(200).json({ success: true, data: report });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+// Auto-allocate remaining monthly budget to goals for the current logged-in user
+export async function allocateRemainingBudgetToGoals(req, res) {
+  try {
+    const userId = req.user.id;
+    const currentMonth = moment().format("YYYY-MM");
+
+    // Find the user's monthly budget for the current month
+    const monthlyBudget = await BudgetModel.findOne({
+      userId,
+      category: "monthly budget",
+      month: currentMonth,
+    });
+
+    if (!monthlyBudget) {
+      return res.status(404).json({
+        success: false,
+        message: `Monthly budget not found for the month '${currentMonth}'`,
+      });
+    }
+
+    if (monthlyBudget.remaining_amount <= 0) {
+      console.log("No remaining amount to allocate");
+      return res.status(400).json({
+        success: false,
+        message: "No remaining amount to allocate",
+      });
+    }
+
+    // Find active goals for the user
+    const activeGoals = await GoalModel.find({ userId, status: "active" });
+    console.log("Active goals", activeGoals);
+
+    if (activeGoals.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No active goals found for allocation",
+      });
+    }
+
+    // Calculate total allocation percentage sum
+    const totalPercentage = activeGoals.reduce(
+      (acc, goal) => acc + (goal.autoAllocationPercentage || 0), // changed: ensure autoAllocationPercentage is defined
+      0
+    );
+
+    // If allocation percentage exceeds 100%, adjust proportionally
+    const normalizedFactor = totalPercentage > 100 ? 100 / totalPercentage : 1;
+
+    for (const goal of activeGoals) {
+      // Ensure goal has the necessary properties
+      if (
+        goal.autoAllocationPercentage === undefined ||
+        goal.currentAmount === undefined ||
+        goal.targetAmount === undefined
+      ) {
+        continue; // Skip this goal if it doesn't have the necessary properties
+      }
+
+      // Calculate the amount to allocate based on percentage
+      const allocatedAmount =
+        ((monthlyBudget.remaining_amount * goal.autoAllocationPercentage) /
+          100) *
+        normalizedFactor;
+
+      // Update goal's current amount
+      goal.currentAmount += allocatedAmount;
+
+      // Deduct the allocated amount from the monthly budget
+      monthlyBudget.remaining_amount -= allocatedAmount;
+
+      // If goal is fully funded, mark as completed
+      if (goal.currentAmount >= goal.targetAmount) {
+        goal.currentAmount = goal.targetAmount;
+        goal.status = "completed";
+
+        // Notify user about goal completion
+        const notification = new NotificationModel({
+          userId,
+          section: "Goals",
+          title: "Goal Completed",
+          message: `Goal '${goal.name}' has been completed`,
+        });
+
+        await notification.save();
+      }
+
+      await goal.save();
+    }
+
+    await monthlyBudget.save();
+
+    // Notify user about allocation
+    const notification = new NotificationModel({
+      userId,
+      section: "Budget",
+      title: "Auto Allocation Complete",
+      message: `Remaining budget for ${currentMonth} has been allocated to your goals.`,
+    });
+
+    await notification.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Remaining budget allocated to goals successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 }
