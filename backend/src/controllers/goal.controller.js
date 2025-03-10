@@ -3,29 +3,39 @@ import GoalModel from "../models/goal.model.js";
 export async function createGoal(req, res) {
   try {
     const userId = req.user.id;
-    const { name, targetAmount, targetDate, autoAllocationPercentage } = req.body;
+    const { name, targetAmount, targetDate, autoAllocationPercentage } =
+      req.body;
 
     if (!name || !targetAmount || !targetDate) {
       return res.status(400).json({
         success: false,
-        message: "Name, target amount, and target date are required"
+        message: "Name, target amount, and target date are required",
       });
+    }
 
+    // Validate that targetAmount is a positive number
+    if (typeof targetAmount !== "number" || targetAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Target amount must be a positive number",
+      });
     }
 
     // Validate future date
-    if (new Date(targetDate) <= new Date()) {
+    if (
+      new Date(targetDate).setHours(0, 0, 0, 0) <=
+      new Date().setHours(0, 0, 0, 0)
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Target date must be in the future"
+        message: "Target date must be in the future",
       });
     }
 
-    
     if (autoAllocationPercentage < 0 || autoAllocationPercentage > 100) {
       return res.status(400).json({
         success: false,
-        message: "Auto allocation percentage must be between 0 and 100"
+        message: "Auto allocation percentage must be between 0 and 100",
       });
     }
 
@@ -34,7 +44,7 @@ export async function createGoal(req, res) {
       name,
       targetAmount,
       targetDate,
-      autoAllocationPercentage
+      autoAllocationPercentage,
     });
 
     res.status(201).json({ success: true, data: goal });
@@ -47,33 +57,48 @@ export async function updateGoal(req, res) {
   try {
     const userId = req.user.id;
     const { id } = req.params;
-    const { name, targetAmount, targetDate, autoAllocationPercentage } = req.body;
+    const { name, targetAmount, targetDate, autoAllocationPercentage } =
+      req.body;
 
     const goal = await GoalModel.findOne({ _id: id, userId });
 
     if (!goal) {
       return res.status(404).json({
         success: false,
-        message: "Goal not found"
+        message: "Goal not found",
       });
     }
 
     if (name) goal.name = name;
-    if (targetAmount) goal.targetAmount = targetAmount;
-    if (targetDate) {
-      if (new Date(targetDate) <= new Date()) {
+
+    if (targetAmount !== undefined) {
+      if (typeof targetAmount !== "number" || targetAmount <= 0) {
         return res.status(400).json({
           success: false,
-          message: "Target date must be in the future"
+          message: "Target amount must be a positive number",
+        });
+      }
+      goal.targetAmount = targetAmount;
+    }
+
+    if (targetDate) {
+      if (
+        new Date(targetDate).setHours(0, 0, 0, 0) <=
+        new Date().setHours(0, 0, 0, 0)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Target date must be in the future",
         });
       }
       goal.targetDate = targetDate;
     }
+
     if (autoAllocationPercentage !== undefined) {
       if (autoAllocationPercentage < 0 || autoAllocationPercentage > 100) {
         return res.status(400).json({
           success: false,
-          message: "Auto allocation percentage must be between 0 and 100"
+          message: "Auto allocation percentage must be between 0 and 100",
         });
       }
       goal.autoAllocationPercentage = autoAllocationPercentage;
@@ -97,11 +122,13 @@ export async function deleteGoal(req, res) {
     if (!goal) {
       return res.status(404).json({
         success: false,
-        message: "Goal not found"
+        message: "Goal not found",
       });
     }
 
-    res.status(200).json({ success: true, message: "Goal deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Goal deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

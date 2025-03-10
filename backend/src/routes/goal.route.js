@@ -5,8 +5,10 @@ import {
   deleteGoal,
   getAllGoals,
 } from "../controllers/goal.controller.js";
+import { verifyToken } from "../middlewares/auth.middleware.js";
 
 const goalRouter = express.Router();
+goalRouter.use(verifyToken);
 
 goalRouter.post("/create", createGoal);
 goalRouter.put("/:id", updateGoal);
