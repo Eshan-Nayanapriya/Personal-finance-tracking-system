@@ -57,6 +57,15 @@ export async function createBudget(req, res) {
 
     if (!category) {
       category = "monthly budget";
+    } else {
+      // Validate category
+      if (!budgetCategories.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
+        });
+      }
     }
 
     // If no month is provided, use the current month
@@ -80,19 +89,66 @@ export async function createBudget(req, res) {
       }
     }
 
-    // Validate category
-    if (!budgetCategories.includes(category)) {
+    // Check if a budget for the same category and month already exists
+    const existingBudget = await BudgetModel.findOne({
+      userId,
+      category,
+      month,
+    });
+    if (existingBudget) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid budget category. Please use the following categories - food, housing, transport, insurance, healthcare, education, entertainment, savings, debt, other",
+        message: `A budget for category '${category}' already exists for the month '${month}', Try updating the existing budget instead or choose a different category or month.`,
       });
+    }
+
+    if (category !== "monthly budget") {
+      const existingMonthlyBudget = await BudgetModel.findOne({
+        userId,
+        category: "monthly budget",
+        month,
+      });
+      if (!existingMonthlyBudget) {
+        return res.status(400).json({
+          success: false,
+          message: `Monthly budget not found for the month '${month}', Please create a monthly budget first.`,
+        });
+      }
+
+      // Deduct the category budget amount from the monthly budget
+      if (existingMonthlyBudget.remaining_amount - convertedAmount < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Monthly budget is not enough to create a budget for category '${category}'`,
+        });
+      } else {
+        existingMonthlyBudget.remaining_amount -= convertedAmount;
+        await existingMonthlyBudget.save();
+      }
+      if (existingMonthlyBudget.remaining_amount === 0) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget Exhausted",
+          message: `Monthly budget exhausted for the month ${month}`,
+        });
+        await newNotification.save();
+      } else if (existingMonthlyBudget.remaining_amount < 5000) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget is very low",
+          message: `Monthly budget is very low for the month ${month}`,
+        });
+        await newNotification.save();
+      }
     }
 
     const newBudget = new BudgetModel({
       userId,
       name,
       category,
+      remaining_amount: convertedAmount,
       amount: convertedAmount,
       month,
     });
@@ -101,7 +157,7 @@ export async function createBudget(req, res) {
 
     const newNotification = new NotificationModel({
       userId,
-      secton: "Budget",
+      section: "Budget",
       title: "Budget Created",
       message: `New budget created for ${category}`,
     });
@@ -158,6 +214,15 @@ export async function updateBudget(req, res) {
     }
 
     let category = budget.category;
+    let month = budget.month;
+
+    if (updates.currency && !currencyCategories.includes(updates.currency)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid currency category, Please use following currency categories: USD, LKR, JPY, EUR, GBP, AUD, CAD, CHF",
+      });
+    }
 
     // Handle currency conversion if amount/currency is updated
     if (updates.amount || updates.currency) {
@@ -170,6 +235,54 @@ export async function updateBudget(req, res) {
       updates.amount = convertedAmount;
     }
 
+    if (updates.amount) {
+      const amountDifference = updates.amount - budget.amount;
+      updates.remaining_amount = budget.remaining_amount + amountDifference;
+    }
+
+    if (updates.month) {
+      // Validate provided month format
+      if (!/^\d{4}-\d{2}$/.test(updates.month)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid month format. Please use 'YYYY-MM' format.",
+        });
+      }
+
+      // Check if the provided month is in the past
+      const currentMonth = moment().format("YYYY-MM");
+      if (
+        moment(updates.month, "YYYY-MM").isBefore(
+          moment(currentMonth, "YYYY-MM")
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot update a budget to a past month.",
+        });
+      }
+
+      month = updates.month;
+    }
+
+    // Check if a budget for the same category and month already exists
+    const existingBudget = await BudgetModel.findOne({
+      userId,
+      category,
+      month,
+      _id: { $ne: budgetId },
+    });
+
+    if (
+      budget.category === "monthly budget" &&
+      updates.category !== "monthly budget"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot change the category of a monthly budget",
+      });
+    }
+
     if (updates.category && budgetCategories.includes(updates.category)) {
       category = updates.category;
     } else if (updates.category) {
@@ -180,6 +293,57 @@ export async function updateBudget(req, res) {
       });
     }
 
+    if (updates.category && existingBudget) {
+      return res.status(400).json({
+        success: false,
+        message: `A budget for category '${category}' already exists for the month '${month}', Try choosing a different category or month.`,
+      });
+    }
+
+    if (updates.category !== "monthly budget") {
+      const existingMonthlyBudget = await BudgetModel.findOne({
+        userId,
+        category: "monthly budget",
+        month,
+      });
+      if (!existingMonthlyBudget) {
+        return res.status(400).json({
+          success: false,
+          message: `Monthly budget not found for the month '${month}', Please create a monthly budget first.`,
+        });
+      }
+
+      if (updates.amount) {
+        const amountDifference = updates.amount - budget.amount;
+        if (existingMonthlyBudget.remaining_amount - amountDifference < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Monthly budget is not enough to update the budget for category '${category}'`,
+          });
+        } else {
+          existingMonthlyBudget.remaining_amount -= amountDifference;
+        }
+      }
+      await existingMonthlyBudget.save();
+      if (existingMonthlyBudget.remaining_amount === 0) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget Exhausted",
+          message: `Monthly budget exhausted for the month ${month}`,
+        });
+        await newNotification.save();
+      } else if (existingMonthlyBudget.remaining_amount < 5000) {
+        const newNotification = new NotificationModel({
+          userId,
+          section: "Budget",
+          title: "Monthly Budget is very low",
+          message: `Monthly budget is very low for the month ${month}`,
+        });
+        await newNotification.save();
+      }
+    }
+
     const updatedBudget = await BudgetModel.findByIdAndUpdate(
       budgetId,
       updates,
@@ -188,7 +352,7 @@ export async function updateBudget(req, res) {
 
     const newNotification = new NotificationModel({
       userId,
-      secton: "Budget",
+      section: "Budget",
       title: "Budget Updated",
       message: `Budget updated for ${category}`,
     });
@@ -219,7 +383,7 @@ export async function deleteBudget(req, res) {
 
     const newNotification = new NotificationModel({
       userId,
-      secton: "Budget",
+      section: "Budget",
       title: "Budget Deleted",
       message: `budget deleted for ${budget.category}`,
     });

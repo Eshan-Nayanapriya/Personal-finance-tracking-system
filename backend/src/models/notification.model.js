@@ -6,7 +6,7 @@ const notificationSchema = new mongoose.Schema({
     ref: "User",
     required: [true, "UserID is required"],
   },
-  secton:{
+  section:{
     type: String,
     required: [true, "Section is required"],
   },

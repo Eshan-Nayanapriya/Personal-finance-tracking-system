@@ -26,5 +26,6 @@ export async function getExchangeRates() {
 export async function convertCurrency(amount, fromCurrency, toCurrency) {
   const rates = await getExchangeRates();
   const usdAmount = amount / rates[fromCurrency]; // Convert to USD first
-  return usdAmount * rates[toCurrency];
+  const convertedAmount = usdAmount * rates[toCurrency];
+  return parseFloat(convertedAmount.toFixed(2)); // Round to 2 decimal points
 }
