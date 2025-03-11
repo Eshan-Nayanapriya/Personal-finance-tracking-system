@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 
+// Verify token
 export async function verifyToken(request, response, next) {
   const authHeader =
     request.headers.authorization || request.headers.Authorization;
@@ -14,6 +15,7 @@ export async function verifyToken(request, response, next) {
 
   const token = authHeader.split(" ")[1]; // Extract token
 
+  // Verify token
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     request.user = decoded;

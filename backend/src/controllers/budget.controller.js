@@ -9,6 +9,7 @@ import moment from "moment";
 
 //create a budget
 export async function createBudget(req, res) {
+  //try-catch block to handle exceptions
   try {
     const userId = req.user.id;
     let { category, amount, month, currency } = req.body;
@@ -217,6 +218,7 @@ export async function updateBudget(req, res) {
     let category = budget.category;
     let month = budget.month;
 
+    // Validate updates
     if (updates.currency && !currencyCategories.includes(updates.currency)) {
       return res.status(400).json({
         success: false,
