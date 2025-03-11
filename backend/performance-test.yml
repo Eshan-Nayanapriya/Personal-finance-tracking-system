@@ -1,0 +1,17 @@
+config:
+  target: "http://localhost:5000" # Replace with your server URL
+  phases:
+    - duration: 60 # Test duration in seconds
+      arrivalRate: 10 # Number of new virtual users per second
+      delay: 5 # Delay between each virtual user in seconds
+scenarios:
+  - flow:
+      - get:
+          url: "/api/goals" # Example endpoint you want to test
+      - post:
+          url: "/api/goals/create" # Another endpoint for testing
+          json:
+            name: "Vacation Fund"
+            targetAmount: 5000
+            targetDate: "2025-12-31"
+            autoAllocationPercentage: 20
