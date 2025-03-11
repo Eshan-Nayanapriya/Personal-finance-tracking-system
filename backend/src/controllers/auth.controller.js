@@ -15,6 +15,7 @@ export async function register(request, response) {
       });
     }
 
+    //Check if user already exists
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
       return response.status(409).json({
@@ -24,6 +25,7 @@ export async function register(request, response) {
       });
     }
 
+    //Hash the password
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(password, salt);
 
@@ -64,6 +66,7 @@ export async function login(request, response) {
       });
     }
 
+    //Check if user exists
     const user = await UserModel.findOne({ email });
     if (!user) {
       return response.status(404).json({
@@ -73,6 +76,7 @@ export async function login(request, response) {
       });
     }
 
+    //Check if password is correct
     const checkpassword = await bcryptjs.compare(password, user.password);
     if (!checkpassword) {
       return response.status(400).json({
